@@ -1,0 +1,20 @@
+<Application
+    x:Class="PCUpCheckTools.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- [Part 270] 토글·콤보 강조색을 Windows 강조색 대신 배터리 도구 액센트(emerald)로 고정. 다크 테마의 강조 채움은 Light2 -->
+            <Color x:Key="SystemAccentColor">#059669</Color>
+            <Color x:Key="SystemAccentColorLight1">#10B981</Color>
+            <Color x:Key="SystemAccentColorLight2">#34D399</Color>
+            <Color x:Key="SystemAccentColorLight3">#6EE7B7</Color>
+            <Color x:Key="SystemAccentColorDark1">#047857</Color>
+            <Color x:Key="SystemAccentColorDark2">#065F46</Color>
+            <Color x:Key="SystemAccentColorDark3">#064E3B</Color>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
