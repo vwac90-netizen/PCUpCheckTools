@@ -3,6 +3,25 @@
 Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 PC 사양**을 한곳에서 보여 주는 무료 앱입니다.
 [pcupcheck.com](https://pcupcheck.com) 의 데스크톱 도구 셋(PureBattery · PCUpCheck 미니 · 사양 스캐너)을 하나로 합쳤습니다.
 
+## 화면
+
+> 시안을 그대로 그린 미리보기입니다. 실제 앱과 조금 다를 수 있어요(예: 체크 상자 → 스위치). 「내 PC 사양」 값은 실제 스캔 결과입니다.
+
+| 하드웨어 | 배터리 | 내 PC 사양 |
+| :---: | :---: | :---: |
+| <img width="240" alt="팝오버 하드웨어 탭" src="docs/images/popover-hardware.png" /> | <img width="240" alt="팝오버 배터리 탭" src="docs/images/popover-battery.png" /> | <img width="240" alt="팝오버 내 PC 사양 탭" src="docs/images/popover-specs.png" /> |
+| 트레이 아이콘을 누르면 열리는 팝오버. 위쪽 요약 타일 4개와 1초마다 바뀌는 수치. | 잔량과 10칸 막대(80/30/10% 색 기준). | 마지막 사양 스캔 결과. 아래 버튼으로 다시 스캔해 클립보드에 복사합니다. |
+
+| 설정 창 — 작업 표시줄 줄 | 설정 창 — 표시 항목 |
+| :---: | :---: |
+| <img width="380" alt="설정 창 작업 표시줄 줄" src="docs/images/settings-strip.png" /> | <img width="380" alt="설정 창 표시 항목" src="docs/images/settings-items.png" /> |
+
+<img alt="작업 표시줄 줄 — 자리가 모자라면 열을 줄이거나 숨김" src="docs/images/taskbar-strip.png" />
+
+작업 표시줄 줄: 자리가 넉넉하면 4열 전부 → 앱 버튼이 늘면 오른쪽 열부터 빼고 → 한 열도 안 들어가면 숨겨서 앱 버튼을 덮지 않습니다.
+
+<img width="420" alt="트레이 아이콘 선택지" src="docs/images/tray-icon.png" />
+
 ## 이런 걸 할 수 있어요
 
 - **트레이 아이콘 하나** — 배터리 잔량 · CPU 사용률 · CPU 온도 중 고른 숫자를 색으로 보여 줍니다(앱 아이콘만 보이게 할 수도 있어요). 배터리가 없는 PC 의 기본값은 CPU 사용률입니다.
@@ -95,3 +114,5 @@ dotnet publish -c Release -r win-x64 -o out
 - Unknown values show as "unknown" / "–", never as 0.
 
 Requirements: Windows 10/11 x64, no runtime install. License: MIT.
+
+Screenshots above are rendered from the design mockup (values in *My PC specs* are a real scan); the app may differ slightly.
