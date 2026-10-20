@@ -37,6 +37,8 @@ public partial class App : Application
             return;
         }
 
+        StartupService.SyncPath(); // [Part 283] 폴더를 옮기거나 새 버전을 다른 폴더에 풀었으면 자동 실행이 지금 exe 를 가리키게
+
         dispatcher = DispatcherQueue.GetForCurrentThread();
         settings = SettingsStore.Load();
         S.Apply(settings.Language); // 화면 문구를 만들기 전에 언어부터

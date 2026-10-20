@@ -24,6 +24,27 @@ public static class StartupService
         }
     }
 
+    /// <summary>
+    /// [Part 283] 앱 폴더를 옮기거나 새 버전을 다른 폴더에 풀면 Run 값이 옛 exe 를 가리킨 채 남았다 — 다음 로그인에 아무것도 안 뜨거나 옛 판이 뜨고,
+    /// 설정 창에는 「꺼짐」 으로 보여 사용자는 고장을 몰랐다. 켜져 있는(값이 있는) 경우에만, 같은 파일 이름의 다른 경로면 지금 exe 로 고쳐 쓴다.
+    /// 값이 없으면(꺼짐) 켜지 않고, 다른 프로그램 이름이면 건드리지 않는다. 실패는 조용히 — 다음 실행에 다시 맞춘다.
+    /// </summary>
+    public static void SyncPath()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            if (key?.GetValue(ValueName) is not string value) return;
+            if (string.Equals(value, Command, StringComparison.OrdinalIgnoreCase)) return;
+            string registered = value.Trim().Trim('"');
+            if (!string.Equals(Path.GetFileName(registered), Path.GetFileName(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase)) return;
+            key.SetValue(ValueName, Command);
+        }
+        catch
+        {
+        }
+    }
+
     /// <returns>레지스트리에 쓰거나 지우는 데 성공하면 true</returns>
     public static bool Set(bool enabled)
     {
