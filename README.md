@@ -38,7 +38,7 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
 ## 필요한 것
 
 - Windows 10 · 11 (x64)
-- 설치할 런타임 없음 — 실행에 필요한 것이 zip 안에 다 들어 있습니다(풀면 약 220MB)
+- 설치할 런타임 없음 — 실행에 필요한 것이 zip 안에 다 들어 있습니다(풀면 약 110MB)
 
 ## 시작하기
 
@@ -54,7 +54,7 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
 - 그 밖의 PC 에서는 「Windows의 PC 보호」 파란 창이 뜰 수 있어요 → **「추가 정보」 → 「실행」**.
 - 받은 파일이 맞는지는 릴리스 노트의 **SHA-256** 과 비교해 확인할 수 있습니다.
   ```powershell
-  Get-FileHash .\PCUpCheckTools-0.1.0-win-x64.zip -Algorithm SHA256
+  Get-FileHash .\PCUpCheckTools-0.2.0-win-x64.zip -Algorithm SHA256
   ```
 
 ## 관리자 권한과 데이터
@@ -80,7 +80,7 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
 
 ## 직접 빌드
 
-.NET 10 SDK 와 Windows 10 SDK(19041) 가 필요합니다.
+.NET 10 SDK 가 필요합니다.
 
 ```powershell
 dotnet publish -c Release -r win-x64 -o out
@@ -89,8 +89,8 @@ dotnet publish -c Release -r win-x64 -o out
 
 ## 사용한 것 · 감사
 
-- [Windows App SDK](https://github.com/microsoft/WindowsAppSDK) (WinUI 3) — MIT
-- [H.NotifyIcon](https://github.com/HavenDV/H.NotifyIcon) — MIT
+- [Avalonia](https://github.com/AvaloniaUI/Avalonia) — MIT (화면 · 트레이)
+- System.Drawing.Common — MIT (작업 표시줄 줄 · 트레이 숫자)
 - [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) — MPL-2.0 (온도 센서)
 - System.Diagnostics.PerformanceCounter — MIT
 

@@ -1,5 +1,9 @@
-using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Themes.Fluent;
+using Avalonia.Threading;
 using PCUpCheckTools.Hardware;
 using PCUpCheckTools.Services;
 using PCUpCheckTools.Views;
@@ -8,54 +12,70 @@ namespace PCUpCheckTools;
 
 // [Part 271 → 277] 진입점. 메인 창 없이 트레이에 상주하고, 트레이를 누르면 팝오버를 연다(AiMeter App 과 같은 틀).
 // [Part 277] 시안대로 — 설정은 따로 뜨는 창(SettingsWindow) · 트레이 아이콘은 고른 것을 그린다(UpdateTray).
-public partial class App : Application
+// [Part 291] WinUI Application(App.xaml) → Avalonia Application(XAML 없이 코드로). 배선은 종전과 같다.
+public sealed class App : Application
 {
-    private Mutex? singleInstance;
+    /// <summary>Program.Main 이 잡은 단일 실행 뮤텍스 — 끝낼 때 놓는다.</summary>
+    internal static Mutex? SingleInstance;
+
+    private IClassicDesktopStyleApplicationLifetime? lifetime;
     private TrayIconService? tray;
     private PopoverWindow? popover;
     private SettingsWindow? settingsWindow;
-    private DispatcherQueueTimer? timer;
+    private DispatcherTimer? timer;
     private HardwareMonitor? hardware;
     private SettingsStore? settings;
-    private DispatcherQueue? dispatcher;
     private int? battery;
     private int themeTick;
     private bool lightTaskbar;
 
-    public App()
+    public override void Initialize()
     {
-        InitializeComponent();
+        RequestedThemeVariant = ThemeVariant.Dark;
+        // [Part 270] 토글·콤보 강조색을 Windows 강조색 대신 배터리 도구 액센트(emerald)로 고정.
+        // [Part 291] Avalonia Fluent 는 Application.Resources 의 SystemAccentColor* 를 보지 않는다(AiMeter Part 287) → 테마 팔레트로.
+        //   WinUI 다크 테마는 스위치를 Light2(#34D399)로 칠했고(원본 실측) Avalonia 는 강조색 그대로 칠한다 → 강조색 = #34D399
+        Styles.Add(new FluentTheme
+        {
+            Palettes = { [ThemeVariant.Dark] = new ColorPaletteResources { Accent = Color.Parse("#34D399") } },
+        });
+        // [Part 291] WinUI 판과 같은 모양으로(원본 픽셀 실측) — 켜진 스위치 손잡이는 검정(Avalonia 기본 흰색),
+        //   콤보는 흰 6% 채움 + 옅은 테두리(원본 #2B3647 · #333D4D, Avalonia 기본은 어두운 채움 + 밝은 테두리 #A0A3A7)
+        var knob = new SolidColorBrush(Colors.Black);
+        Resources["ToggleSwitchKnobFillOn"] = knob;
+        Resources["ToggleSwitchKnobFillOnPointerOver"] = knob;
+        Resources["ToggleSwitchKnobFillOnPressed"] = knob;
+        //   「위치 초기화」 버튼 · 미세조정 숫자 칸도 원본은 같은 #2B3647(Avalonia 기본 #4B5462 · #121923). 바탕을 직접 준 버튼(탭·칸 등)은 영향 없음
+        var fill = new SolidColorBrush(Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF));
+        var edge = new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+        Resources["ComboBoxBackground"] = fill;
+        Resources["ComboBoxBorderBrush"] = edge;
+        Resources["ButtonBackground"] = fill;
+        Resources["TextControlBackground"] = fill;
+        Resources["TextControlBorderBrush"] = edge;
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    public override void OnFrameworkInitializationCompleted()
     {
-        // 두 번째 실행은 조용히 끝낸다 — 트레이 아이콘이 두 개 생기지 않게(PureBattery net48 판은 두 개가 떴다)
-        singleInstance = new Mutex(true, "PCUpCheckTools.SingleInstance", out bool created);
-        if (!created)
-        {
-            Exit();
-            return;
-        }
+        lifetime = (IClassicDesktopStyleApplicationLifetime)ApplicationLifetime!;
 
         StartupService.SyncPath(); // [Part 283] 폴더를 옮기거나 새 버전을 다른 폴더에 풀었으면 자동 실행이 지금 exe 를 가리키게
 
-        dispatcher = DispatcherQueue.GetForCurrentThread();
         settings = SettingsStore.Load();
         S.Apply(settings.Language); // 화면 문구를 만들기 전에 언어부터
         lightTaskbar = TaskbarTheme.IsLight();
 
         // [Part 273] 하드웨어 수치 + 작업 표시줄 줄(HwMonitorMini 의 수집·도킹)
-        hardware = new HardwareMonitor(settings, dispatcher);
+        hardware = new HardwareMonitor(settings);
         popover = new PopoverWindow(settings, hardware, OpenSettings);
-        tray = new TrayIconService();
+        tray = new TrayIconService(this);
         tray.LeftClick += () => popover.Toggle();
         tray.ExitRequested += Shutdown;
         hardware.Updated += UpdateTray;
         hardware.Start();
 
         // PureBattery net48 판과 같은 1분 주기
-        timer = dispatcher.CreateTimer();
-        timer.Interval = TimeSpan.FromMinutes(1);
+        timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         timer.Tick += (_, _) => UpdateBattery();
         timer.Start();
         UpdateBattery();
@@ -71,6 +91,8 @@ public partial class App : Application
             popover.Toggle();
         }
         if (Environment.GetCommandLineArgs().Contains("--settings")) OpenSettings();
+
+        base.OnFrameworkInitializationCompleted();
     }
 
     private void UpdateBattery()
@@ -83,13 +105,14 @@ public partial class App : Application
     /// <summary>[Part 277] 설정 창 — 하나만. 열려 있으면 앞으로</summary>
     private void OpenSettings()
     {
-        if (settings is null || hardware is null || dispatcher is null) return;
+        if (settings is null || hardware is null) return;
         if (settingsWindow is null)
         {
-            settingsWindow = new SettingsWindow(settings, hardware, dispatcher);
+            settingsWindow = new SettingsWindow(settings, hardware);
             settingsWindow.LanguageChanged += () => { popover?.Render(); UpdateTray(); };
             settingsWindow.TrayChanged += () => { UpdateTray(); popover?.Render(); };
             settingsWindow.Closed += (_, _) => settingsWindow = null;
+            settingsWindow.Show();
         }
         settingsWindow.Activate();
     }
@@ -140,10 +163,9 @@ public partial class App : Application
         hardware?.Dispose(); // 작업 표시줄에서 줄을 떼고 창을 없앤다 · 온도 연결을 끊으면 센서 모드도 끝난다
         tray?.Dispose();
         settingsWindow?.Close();
-        popover?.Close();
-        singleInstance?.ReleaseMutex();
-        singleInstance?.Dispose();
-        singleInstance = null;
-        Exit();
+        popover?.CloseForExit();
+        SingleInstance?.ReleaseMutex();
+        SingleInstance = null; // Program.Main 의 using 이 Dispose 한다
+        lifetime?.Shutdown();
     }
 }

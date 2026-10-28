@@ -2,37 +2,33 @@
 
   <!-- [Part 271] PC Up Check Tools — 배터리 · 사양 스캔 · 하드웨어 모니터를 한 트레이 앱으로(런처 대체). AiMeter 는 따로.
        화면 틀은 AiMeter(tools/AiMeter)와 같다. 기존 net48 PureBattery · net8 HwMonitorMini · 스캐너 exe 는 사이트 직접 배포용으로 당분간 유지.
-       WinUI 3 unpackaged + self-contained(런타임 설치 불필요). 산출물이 25MB 를 넘으므로 GitHub Releases 로 배포한다(사용자 결정). -->
+       self-contained(런타임 설치 불필요). 산출물이 25MB 를 넘으므로 GitHub Releases 로 배포한다(사용자 결정).
+       [Part 291] WinUI 3 → Avalonia 12 (AiMeter Part 287 과 같은 방식) — 같은 화면을 맥에서도 그리기 위해(사용자 결정). 2a 는 Windows 만(동작 동일).
+       작업 표시줄 줄·트레이 숫자는 Win32·GDI+ 그대로라 System.Drawing.Common 을 명시한다(종전엔 WinUI 쪽에서 따라왔다).
+       WindowsAppSDK·H.NotifyIcon 과 .pri 복사는 WinUI 전용이라 뺐다. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>PCUpCheckTools</RootNamespace>
     <AssemblyName>PCUpCheckTools</AssemblyName>
     <Product>PC Up Check Tools</Product>
     <Company>PC Up Check</Company>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x64;ARM64</Platforms>
-    <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$(Platform.ToLowerInvariant())</RuntimeIdentifier>
-    <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-
-    <WindowsPackageType>None</WindowsPackageType>
     <SelfContained>true</SelfContained>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-
-    <!-- [Part 275] Program.cs 가 진입점 — sensors 인자면 WinUI 를 띄우지 않고 관리자 센서 모드로 -->
-    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- [Part 291] Skia 네이티브 .pdb 가 100MB — 배포물에 넣지 않는다(AiMeter Part 287) -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.1.3" />
-    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
     <!-- [Part 273] 하드웨어 수치(CPU·디스크·네트워크·GPU 성능 카운터) — HwMonitorMini 와 같은 패키지·버전 -->
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
     <!-- [Part 275] 온도(센서 모드에서만) — HwMonitorMini 와 같은 패키지·버전(MPL-2.0) -->
@@ -44,9 +40,12 @@
     <EmbeddedResource Include="Scan\collect-specs.ps1" LogicalName="PCUpCheckTools.Scan.collect-specs.ps1" />
   </ItemGroup>
 
-  <!-- AiMeter Part 250 과 같은 이유: unpackaged WinUI 의 dotnet publish 는 앱 리소스 색인(<앱>.pri)을 빠뜨린다 → 없으면 시작하자마자 죽는다 -->
-  <Target Name="CopyAppPriToPublish" AfterTargets="Publish" Condition="Exists('$(OutDir)$(AssemblyName).pri')">
-    <Copy SourceFiles="$(OutDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  <!-- [Part 291] Skia·HarfBuzz 네이티브 .pdb(합 100MB)는 DebugType=none 으로는 안 빠진다(AiMeter Part 287 실측) → publish 뒤에 지운다 -->
+  <Target Name="RemoveNativePdbFromPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <PublishedPdb Include="$(PublishDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(PublishedPdb)" />
   </Target>
 
 </Project>

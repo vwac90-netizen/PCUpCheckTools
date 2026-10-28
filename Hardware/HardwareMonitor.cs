@@ -4,7 +4,8 @@
 // - 테마(5틱) · 재도킹(5틱) · 배율 · 세로 작업 표시줄 감시는 원본과 같은 순서·간격.
 // - [Part 277] 시계 왼쪽 기준이면 작업 표시줄 앱 버튼 끝을 재서(UIA · 백그라운드) 자리만큼만 — 오른쪽 열부터 빼고, 안 되면 숨김(시안 ③).
 // - [Part 275] 온도는 설정에서 켜면 관리자 센서 모드(TemperatureClient → SensorHost)에서 받는다. 꺼져 있으면 HwMonitorMini Lite 와 같은 배치·항목.
-using Microsoft.UI.Dispatching;
+// - [Part 291] WinUI DispatcherQueueTimer → Avalonia DispatcherTimer(같은 UI 스레드 · 1초). 그 밖은 그대로.
+using Avalonia.Threading;
 using PCUpCheckTools.Services;
 
 namespace PCUpCheckTools.Hardware
@@ -16,7 +17,7 @@ namespace PCUpCheckTools.Hardware
         private const int FloatingHeight = 40; // 원본 MetricsView.Height(도킹하면 작업 표시줄 높이) — 배율을 곱한다
 
         private readonly SettingsStore settings;
-        private readonly DispatcherQueueTimer timer;
+        private readonly DispatcherTimer timer;
         private readonly ResourceReader resourceReader = new();
         private readonly NetworkSpeedReader networkReader = new();
         private readonly GpuNpuReader gpuNpuReader = new(); // 첫 읽기가 느려 스스로 백그라운드에서 데운다
@@ -50,15 +51,14 @@ namespace PCUpCheckTools.Hardware
         /// <summary>1초마다 새 값 — 팝오버가 열려 있으면 다시 그린다</summary>
         public event Action? Updated;
 
-        public HardwareMonitor(SettingsStore settings, DispatcherQueue dispatcher)
+        public HardwareMonitor(SettingsStore settings)
         {
             this.settings = settings;
             docker = new TaskbarDocker(settings);
             slots = MetricCatalog.Parse(settings.Slots, Temperatures);
             shown = slots;
             lightTaskbar = TaskbarTheme.IsLight();
-            timer = dispatcher.CreateTimer();
-            timer.Interval = TimeSpan.FromSeconds(1);
+            timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (_, _) => Tick();
         }
 

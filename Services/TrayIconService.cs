@@ -1,11 +1,10 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
-using H.NotifyIcon;
-using H.NotifyIcon.Core;
-using Microsoft.UI.Xaml.Controls;
+using Avalonia.Controls;
 
 namespace PCUpCheckTools.Services;
 
@@ -13,39 +12,37 @@ namespace PCUpCheckTools.Services;
 // - [Part 277] 무엇을 보일지 고른다(시안 ④): 숫자(배터리 · CPU 사용률 · CPU 온도) 또는 앱 아이콘. 고르는 규칙은 App 이 정하고 여기는 그리기만.
 // - 숫자 색: 호출부가 넘긴다(배터리 80/30/10 4색 · CPU·온도는 Thresholds 단계). 모르면 회색 「–」 — 숫자를 지어내지 않는다.
 // - 시스템 작은 아이콘 크기(배율 반영)로 그린다 — 고배율에서 흐려지지 않게(Part 270).
+// [Part 291] H.NotifyIcon(WinUI) → Avalonia TrayIcon. 그리기(GDI+)는 그대로 두고 PNG 로 넘긴다 — 숫자 모양을 바꾸지 않으려고.
 public sealed class TrayIconService : IDisposable
 {
-    private readonly TaskbarIcon icon;
-    private readonly MenuFlyoutItem exitItem;
-    private Icon? currentIcon;
-    private IntPtr currentHandle;
+    private readonly TrayIcon icon;
+    private readonly TrayIcons icons;
+    private readonly NativeMenuItem exitItem;
     private string lastKey = "";
 
     public event Action? LeftClick;
     public event Action? ExitRequested;
 
-    public TrayIconService()
+    public TrayIconService(Avalonia.Application app)
     {
-        icon = new TaskbarIcon
+        exitItem = new NativeMenuItem(S.T("끝내기", "Exit")) { Command = new Command(() => ExitRequested?.Invoke()) };
+        icon = new TrayIcon
         {
             ToolTipText = "PC Up Check Tools",
-            NoLeftClickDelay = true,
-            ContextMenuMode = ContextMenuMode.PopupMenu,
-            LeftClickCommand = new Command(() => LeftClick?.Invoke()),
+            Menu = new NativeMenu { exitItem },
         };
-        exitItem = new MenuFlyoutItem { Command = new Command(() => ExitRequested?.Invoke()) };
-        var menu = new MenuFlyout();
-        menu.Items.Add(exitItem);
-        icon.ContextFlyout = menu;
+        icon.Clicked += (_, _) => LeftClick?.Invoke();
         Show(null, Color.Gray, appIcon: true, "PC Up Check Tools");
-        icon.ForceCreate();
+        icons = new TrayIcons { icon };
+        TrayIcon.SetIcons(app, icons);
+        icon.IsVisible = true;
     }
 
     /// <summary>그린다. 글자·색·종류가 같으면 그림은 그대로 두고 툴팁만 바꾼다.</summary>
     /// <param name="text">숫자(예: "89"). null 이면 「–」(모름)</param>
     public void Show(string? text, Color color, bool appIcon, string tooltip)
     {
-        exitItem.Text = S.T("끝내기", "Exit");
+        exitItem.Header = S.T("끝내기", "Exit");
         icon.ToolTipText = tooltip.Length > 127 ? tooltip[..126] + "…" : tooltip; // 트레이 툴팁은 127자 제한
         string key = appIcon ? "app" : $"{text}|{color.ToArgb()}";
         if (key == lastKey) return;
@@ -82,13 +79,11 @@ public sealed class TrayIconService : IDisposable
             }
         }
 
-        IntPtr handle = bmp.GetHicon();
-        var next = Icon.FromHandle(handle);
-        icon.Icon = next;
-        currentIcon?.Dispose();
-        if (currentHandle != IntPtr.Zero) DestroyIcon(currentHandle); // GetHicon 핸들은 직접 해제
-        currentIcon = next;
-        currentHandle = handle;
+        // [Part 291] 종전엔 GetHicon 핸들을 직접 만들고 해제했다 — 이제는 PNG 로 넘기고 아이콘 핸들은 Avalonia 가 관리한다
+        using var png = new MemoryStream();
+        bmp.Save(png, ImageFormat.Png);
+        png.Position = 0;
+        icon.Icon = new WindowIcon(png);
     }
 
     /// <summary>앱 아이콘 — 칩 모양(웹 파비콘·HwMonitorMini app.ico 와 같은 memory 칩 모티프), 하늘색</summary>
@@ -109,14 +104,9 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        icon.IsVisible = false;
         icon.Dispose();
-        currentIcon?.Dispose();
-        if (currentHandle != IntPtr.Zero) DestroyIcon(currentHandle);
-        currentHandle = IntPtr.Zero;
     }
-
-    [DllImport("user32.dll")]
-    private static extern bool DestroyIcon(IntPtr handle);
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetricsForDpi(int index, uint dpi);
