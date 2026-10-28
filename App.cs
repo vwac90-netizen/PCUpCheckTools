@@ -45,6 +45,17 @@ public sealed class App : Application
         Resources["ToggleSwitchKnobFillOn"] = knob;
         Resources["ToggleSwitchKnobFillOnPointerOver"] = knob;
         Resources["ToggleSwitchKnobFillOnPressed"] = knob;
+        // [Part 293] 꺼진 스위치도 — Part 291 은 켜진 상태만 대조했다. WinUI 값(AiMeter 0.1.11 실측 #18202F·#91959D·#CACCCF 를 알파로 환산):
+        //   바탕 검정 8% · 테두리 흰 55% · 손잡이 흰 77% (Avalonia 기본: 바탕 투명 · 밝은 테두리 · 흰 손잡이)
+        var offFill = new SolidColorBrush(Color.FromArgb(0x14, 0x00, 0x00, 0x00));
+        var offStroke = new SolidColorBrush(Color.FromArgb(0x8B, 0xFF, 0xFF, 0xFF));
+        var offKnob = new SolidColorBrush(Color.FromArgb(0xC5, 0xFF, 0xFF, 0xFF));
+        foreach (var state in new[] { "", "PointerOver", "Pressed" })
+        {
+            Resources["ToggleSwitchFillOff" + state] = offFill;
+            Resources["ToggleSwitchStrokeOff" + state] = offStroke;
+            Resources["ToggleSwitchKnobFillOff" + state] = offKnob;
+        }
         //   「위치 초기화」 버튼 · 미세조정 숫자 칸도 원본은 같은 #2B3647(Avalonia 기본 #4B5462 · #121923). 바탕을 직접 준 버튼(탭·칸 등)은 영향 없음
         var fill = new SolidColorBrush(Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF));
         var edge = new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
