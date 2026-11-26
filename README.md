@@ -31,7 +31,8 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
   - **내 PC 사양**: 마지막 사양 스캔 결과(CPU · RAM · 그래픽 · 저장 장치 · 화면 · 시스템 · 연식)
 - **사양 스캔** — 버튼 하나로 이 PC 사양을 모아 클립보드에 복사합니다. [pcupcheck.com/scanner](https://pcupcheck.com/scanner) 에서 「스캔 데이터 붙여넣기」 를 누르면 AI 업그레이드 진단으로 이어집니다. 결과 형식은 사이트의 사양 스캐너(`PCUpCheck_Setup.exe`)와 같습니다.
 - **작업 표시줄 줄** — 시계 옆에 2줄 × 4칸으로 수치를 띄웁니다(칸마다 항목 선택). 클릭은 아래 작업 표시줄로 그대로 통과합니다. 작업 표시줄 앱 버튼이 늘어 자리가 모자라면 오른쪽 열부터 줄이고, 그래도 안 되면 숨겨서 앱 버튼을 덮지 않습니다.
-- **설정 창** — 언어(자동 · 한국어 · English), 트레이 아이콘에 표시할 것, Windows 시작 때 실행, 온도, 줄 위치 · 미세조정 · 표시 항목.
+- **설정 창** — 언어(자동 · 한국어 · English), 트레이 아이콘에 표시할 것, Windows 시작 때 실행, 업데이트 자동 확인, 온도, 줄 위치 · 미세조정 · 표시 항목.
+- **업데이트 알림** (0.2.2~) — 하루 한 번 새 버전이 있는지 확인해 화면 오른쪽 아래에 알려 줍니다. 「지금 업데이트」 를 누르면 받아서 **SHA-256 을 확인**한 뒤 같은 폴더에 바꾸고 다시 켭니다(설정 · 자동 실행 · 온도는 그대로). 바꾸다 실패하면 원래 파일로 되돌립니다. 설정에서 끌 수 있습니다.
 
 모르는 값은 `0` 이 아니라 **「모름」 · 「–」** 로 보여 줍니다.
 
@@ -45,6 +46,7 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
 1. [Releases](https://github.com/vwac90-netizen/PCUpCheckTools/releases/latest) 에서 `PCUpCheckTools-<버전>-win-x64.zip` 을 받습니다.
 2. 원하는 폴더에 풀고 `PCUpCheckTools.exe` 를 실행합니다. 처음 실행하면 팝오버가 열리며 사용법을 한 줄로 알려 줍니다.
 3. 트레이 아이콘이 안 보이면 작업 표시줄 오른쪽 **^**(숨겨진 아이콘)를 펼치세요.
+4. 0.2.2 부터는 새 버전이 나오면 앱이 알려 줍니다 — 「지금 업데이트」 를 누르면 됩니다. 앱을 쓰기 권한이 없는 폴더(예: 「C:\Program Files」)에 풀었다면 자동으로 바꿀 수 없어 다운로드 페이지를 안내합니다.
 
 ### ⚠️ 처음 실행할 때 Windows 가 막을 수 있어요
 
@@ -54,12 +56,12 @@ Windows 트레이에 상주하면서 **배터리 · 하드웨어 수치 · 내 P
 - 그 밖의 PC 에서는 「Windows의 PC 보호」 파란 창이 뜰 수 있어요 → **「추가 정보」 → 「실행」**.
 - 받은 파일이 맞는지는 릴리스 노트의 **SHA-256** 과 비교해 확인할 수 있습니다.
   ```powershell
-  Get-FileHash .\PCUpCheckTools-0.2.1-win-x64.zip -Algorithm SHA256
+  Get-FileHash .\PCUpCheckTools-0.2.2-win-x64.zip -Algorithm SHA256
   ```
 
 ## 관리자 권한과 데이터
 
-- **인터넷으로 아무것도 보내지 않습니다.** (「진단하러 가기」 를 누르면 브라우저로 pcupcheck.com 을 열 뿐입니다.)
+- **사양 · 설정은 인터넷으로 보내지 않습니다.** 앱이 인터넷에 연결하는 것은 ① 업데이트 확인(하루 한 번 GitHub 에 최신 버전 정보만 요청 · 설정 「업데이트 자동 확인」 으로 끌 수 있음) ② 업데이트를 고르면 그 zip 받기뿐입니다. 「진단하러 가기」 를 누르면 브라우저로 pcupcheck.com 을 엽니다.
 - **사양 스캔** 결과는 클립보드와 `%APPDATA%\PCUpCheckTools\last-scan.json` 에만 남습니다. 스캔은 Windows PowerShell 로 `Win32_Processor` 등 WMI 정보와 `Get-PhysicalDisk` 를 읽습니다(`Scan/collect-specs.ps1`).
 - **설정**은 `%APPDATA%\PCUpCheckTools\settings.json`.
 - **온도**(기본 꺼짐)는 CPU · SSD · 메인보드 센서를 읽으려면 관리자 권한이 필요합니다. 설정에서 처음 켤 때 **한 번만** UAC 를 묻고 작업 스케줄러에 `PCUpCheckTools\Sensors` 작업(최고 권한 · 트리거 없음)을 등록합니다. 그 뒤로는 앱이 이 작업으로 센서 모드를 띄우므로 다시 묻지 않습니다. 관리자 권한으로 하는 일은 온도 센서 읽기([LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor))뿐이며, 값은 이 사용자만 접속할 수 있는 파이프로 앱에 전달됩니다.
@@ -108,7 +110,8 @@ dotnet publish -c Release -r win-x64 -o out
 - **Popover**: four summary tiles plus *Hardware*, *Battery* and *My PC specs* tabs.
 - **Spec scan** copies your PC's specs to the clipboard in the same format as the site's scanner — paste them at [pcupcheck.com/scanner](https://pcupcheck.com/scanner).
 - **Taskbar strip**: 2 × 4 numbers next to the clock; clicks pass through; it drops columns (or hides) instead of covering taskbar buttons.
-- **Nothing is sent online.** Settings and the last scan stay in `%APPDATA%\PCUpCheckTools`.
+- **Specs and settings are never sent online.** The app only goes online to check for updates (once a day, asking GitHub for the latest version — can be turned off) and to download an update you choose. Settings and the last scan stay in `%APPDATA%\PCUpCheckTools`.
+- **Update notice** (0.2.2+): when a new version is out, a notice appears at the bottom right; *Update now* downloads it, checks its SHA-256, replaces the app in the same folder and restarts it (rolls back if replacing fails).
 - **Temperatures** (off by default) need admin rights: the first time you turn them on, Windows asks once (UAC) and a scheduled task `PCUpCheckTools\Sensors` is registered so it won't ask again. Admin rights are used only to read temperature sensors (LibreHardwareMonitor).
 - Not code-signed yet: Smart App Control blocks it; elsewhere use *More info → Run anyway*. Verify the SHA-256 in the release notes.
 - Unknown values show as "unknown" / "–", never as 0.

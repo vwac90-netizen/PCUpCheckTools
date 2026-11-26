@@ -28,6 +28,12 @@ public sealed class App : Application
     private int? battery;
     private int themeTick;
     private bool lightTaskbar;
+    // [Part 315] 업데이트 — 알림 창 · 확인 타이머(시작 1분 뒤, 그 뒤 하루마다) · 찾은 새 버전 · 설치 중
+    private UpdateToast? toast;
+    private DispatcherTimer? updateTimer;
+    private UpdateService.Release? update;
+    private bool updating;
+    private int lastProgressPercent = -1;
 
     public override void Initialize()
     {
@@ -103,6 +109,32 @@ public sealed class App : Application
         }
         if (Environment.GetCommandLineArgs().Contains("--settings")) OpenSettings();
 
+        // [Part 315] 업데이트 알림
+        toast = new UpdateToast();
+        toast.InstallRequested += () => _ = SafeInstallAsync();
+        toast.PageRequested += () => OpenUrl(update?.PageUrl ?? UpdateService.ReleasesPage);
+        toast.LaterRequested += () =>
+        {
+            if (update is not null && !updating)
+            {
+                settings.DismissedUpdate = update.Version.ToString(3);
+                settings.Save();
+            }
+            toast.Hide();
+        };
+        if (Environment.GetCommandLineArgs().Contains(UpdateService.UpdatedArgument)) toast.ShowUpdated(UpdateService.CurrentText);
+        else if (Environment.GetCommandLineArgs().Contains(UpdateService.UpdateFailedArgument))
+            toast.ShowError(S.T("새 파일로 바꾸지 못해 지금 버전으로 되돌렸습니다. 다운로드 페이지에서 받아 주세요.", "Couldn't replace the app files, so this version was kept. Please download the update from the release page."));
+        updateTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) }; // 시작 직후의 부하를 피해 1분 뒤 첫 확인
+        updateTimer.Tick += async (_, _) =>
+        {
+            updateTimer.Interval = TimeSpan.FromHours(24);
+            // 부가 기능의 예외가 트레이 앱 전체를 끝내지 않게 — async void 처리기의 예외는 앱을 죽인다(시험 중 실측)
+            try { await CheckUpdateAsync(manual: false); }
+            catch (Exception) { }
+        };
+        updateTimer.Start();
+
         base.OnFrameworkInitializationCompleted();
     }
 
@@ -119,7 +151,7 @@ public sealed class App : Application
         if (settings is null || hardware is null) return;
         if (settingsWindow is null)
         {
-            settingsWindow = new SettingsWindow(settings, hardware);
+            settingsWindow = new SettingsWindow(settings, hardware, () => CheckUpdateAsync(manual: true));
             settingsWindow.LanguageChanged += () => { popover?.Render(); UpdateTray(); };
             settingsWindow.TrayChanged += () => { UpdateTray(); popover?.Render(); };
             settingsWindow.Closed += (_, _) => settingsWindow = null;
@@ -168,9 +200,71 @@ public sealed class App : Application
         tray.Show(text, color, app, tip);
     }
 
+    /// <summary>[Part 315] 새 버전 확인. 자동 확인은 설정이 켜져 있을 때만, 「나중에」 고른 버전은 알림 창 없이 팝오버 안내만.
+    /// 「지금 확인」(manual)은 설정과 무관하게 묻고, 새 버전이면 알림 창을 띄운다.</summary>
+    private async Task<UpdateService.CheckResult> CheckUpdateAsync(bool manual)
+    {
+        if (settings is null || (!manual && !settings.CheckUpdates) || updating) return new UpdateService.CheckResult(UpdateService.CheckStatus.Failed, null);
+        UpdateService.CheckResult result;
+        try { result = await UpdateService.CheckAsync(); }
+        catch (Exception) { return new UpdateService.CheckResult(UpdateService.CheckStatus.Failed, null); } // 확인 실패가 앱을 끝내지 않게
+        if (result.Status == UpdateService.CheckStatus.Available && result.Release is UpdateService.Release r)
+        {
+            update = r;
+            string version = r.Version.ToString(3);
+            popover?.SetUpdate(version, () => _ = SafeInstallAsync());
+            if (manual || settings.DismissedUpdate != version) toast?.ShowAvailable(version, UpdateService.CanInstall(r));
+        }
+        return result;
+    }
+
+    /// <summary>[Part 315] 설치 중 예상 못 한 예외 — 앱을 죽이지 않고 알림 창에 실패로 보인다</summary>
+    private async Task SafeInstallAsync()
+    {
+        try { await InstallUpdateAsync(); }
+        catch (Exception)
+        {
+            updating = false;
+            toast?.ShowError(S.T("업데이트 중 문제가 생겼습니다. 다운로드 페이지에서 받아 주세요.", "Something went wrong while updating. Please download it from the release page."));
+        }
+    }
+
+    /// <summary>[Part 315] 받아서 검증하고 도우미를 띄운 뒤 앱을 끝낸다. 도우미가 덮어쓰고 다시 실행한다.</summary>
+    private async Task InstallUpdateAsync()
+    {
+        if (update is null || updating || toast is null) return;
+        if (!UpdateService.CanInstall(update)) { OpenUrl(update.PageUrl); return; }
+        updating = true;
+        lastProgressPercent = -1;
+        toast.ShowProgress(null);
+        var progress = new Progress<double>(f =>
+        {
+            int pct = (int)(f * 100);
+            if (pct == lastProgressPercent) return; // 받는 동안 수백 번 오므로 1% 단위로만 다시 그린다
+            lastProgressPercent = pct;
+            toast.ShowProgress(f);
+        });
+        string? error = await UpdateService.PrepareAsync(update, progress);
+        if (error is null)
+        {
+            Shutdown(); // 도우미가 이 프로세스가 끝나길 기다린다
+            return;
+        }
+        updating = false;
+        toast.ShowError(error);
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception) { }
+    }
+
     private void Shutdown()
     {
         timer?.Stop();
+        updateTimer?.Stop();
+        toast?.CloseForExit();
         hardware?.Dispose(); // 작업 표시줄에서 줄을 떼고 창을 없앤다 · 온도 연결을 끊으면 센서 모드도 끝난다
         tray?.Dispose();
         settingsWindow?.Close();

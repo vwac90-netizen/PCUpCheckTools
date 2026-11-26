@@ -55,6 +55,12 @@ public sealed class SettingsStore
     public const string OverflowShrink = "shrink";
     public const string OverflowHide = "hide";
 
+    /// <summary>[Part 315] 업데이트 자동 확인 — 시작 1분 뒤 · 하루마다 GitHub 에 최신 버전만 묻는다. 기본 켬(설정 파일에 없던 옛 사용자도 켬)</summary>
+    public bool CheckUpdates { get; set; } = true;
+
+    /// <summary>[Part 315] 알림 창에서 「나중에」 를 고른 버전 — 그 버전은 알림 창을 다시 띄우지 않는다(팝오버 안내는 남는다)</summary>
+    public string? DismissedUpdate { get; set; }
+
     /// <summary>설정 파일이 없었다 = 처음 실행. PureBattery(net48)의 실행 전 안내창 대신 팝오버를 한 번 열어 안내한다.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsFirstRun { get; private set; }

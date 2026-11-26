@@ -29,6 +29,10 @@ public sealed class SettingsWindow : Window
     private bool temperatureDeclined;
     private bool saveFailed;
     private TextBlock? temperatureStatus;
+    // [Part 315] 「지금 확인」 — App 의 확인(새 버전이면 알림 창까지)
+    private readonly Func<Task<UpdateService.CheckResult>> checkUpdate;
+    private string? updateStatus;
+    private bool checkingUpdate;
 
     /// <summary>언어를 바꿨다 — App 이 팝오버·트레이를 새 언어로</summary>
     public event Action? LanguageChanged;
@@ -36,10 +40,11 @@ public sealed class SettingsWindow : Window
     /// <summary>트레이 아이콘 표시를 바꿨다 · 온도를 켜거나 껐다 — App 이 트레이를 다시 그린다</summary>
     public event Action? TrayChanged;
 
-    public SettingsWindow(SettingsStore settings, HardwareMonitor hardware)
+    public SettingsWindow(SettingsStore settings, HardwareMonitor hardware, Func<Task<UpdateService.CheckResult>> checkUpdate)
     {
         this.settings = settings;
         this.hardware = hardware;
+        this.checkUpdate = checkUpdate;
 
         nav = new StackPanel { Spacing = 2 };
         content = new StackPanel { Spacing = 14 };
@@ -181,6 +186,16 @@ public sealed class SettingsWindow : Window
                 if (on == StartupService.IsEnabled()) return;
                 startupFailed.IsVisible = !StartupService.Set(on);
             }),
+            // [Part 315] 업데이트 자동 확인
+            SwitchRow(S.T("업데이트 자동 확인", "Check for updates automatically"),
+                S.T("하루 한 번 GitHub 에 최신 버전 번호만 묻고, 새 버전이 있으면 알려 줍니다. 사양 · 설정은 보내지 않습니다.",
+                    "Once a day, asks GitHub only for the latest version number and tells you when there's a new one. Specs and settings are not sent."),
+                settings.CheckUpdates, on =>
+                {
+                    if (on == settings.CheckUpdates) return;
+                    settings.CheckUpdates = on;
+                    Save();
+                }),
         }));
         content.Children.Add(startupFailed);
     }
@@ -387,10 +402,31 @@ public sealed class SettingsWindow : Window
         content.Children.Add(Card(new List<Control>
         {
             new TextBlock { Text = $"PC Up Check Tools {version}", FontSize = 15, FontWeight = FontWeight.SemiBold, Foreground = Brush(Text1) },
-            Caption(S.T("배터리 · 하드웨어 수치 · 사양 스캔. 사양은 인터넷으로 보내지 않고 이 PC 의 클립보드와 설정 폴더(%APPDATA%\\PCUpCheckTools)에만 남습니다.",
-                "Battery, hardware numbers and spec scan. Specs are never sent online — they stay in this PC's clipboard and settings folder (%APPDATA%\\PCUpCheckTools).")),
+            Caption(S.T("배터리 · 하드웨어 수치 · 사양 스캔. 사양은 인터넷으로 보내지 않고 이 PC 의 클립보드와 설정 폴더(%APPDATA%\\PCUpCheckTools)에만 남습니다. 업데이트를 확인할 때만 GitHub 에 최신 버전 정보를 요청합니다.",
+                "Battery, hardware numbers and spec scan. Specs are never sent online — they stay in this PC's clipboard and settings folder (%APPDATA%\\PCUpCheckTools). The app only contacts GitHub to ask for the latest version when checking for updates.")),
             link,
         }));
+
+        // [Part 315] 지금 확인 — 결과를 한 줄로(새 버전이면 오른쪽 아래 알림 창도 뜬다)
+        var check = new Button { Content = checkingUpdate ? S.T("확인하는 중…", "Checking…") : S.T("업데이트 확인", "Check for updates"), IsEnabled = !checkingUpdate, FontSize = 13 };
+        check.Click += async (_, _) =>
+        {
+            checkingUpdate = true;
+            updateStatus = null;
+            Render();
+            var result = await checkUpdate();
+            checkingUpdate = false;
+            updateStatus = result.Status switch
+            {
+                UpdateService.CheckStatus.UpToDate => S.T($"최신 버전입니다({UpdateService.CurrentText}).", $"You're up to date ({UpdateService.CurrentText})."),
+                UpdateService.CheckStatus.Available => S.T($"새 버전 {result.Release!.Version.ToString(3)} 이 있습니다 — 오른쪽 아래 알림을 보세요.", $"Version {result.Release!.Version.ToString(3)} is available — see the notice at the bottom right."),
+                _ => S.T("확인하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", "Couldn't check. Check your internet connection and try again."),
+            };
+            Render();
+        };
+        var items = new List<Control> { check };
+        if (updateStatus is not null) items.Add(Caption(updateStatus));
+        content.Children.Add(Card(items));
     }
 
     [DllImport("dwmapi.dll")]

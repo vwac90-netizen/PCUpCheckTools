@@ -46,6 +46,9 @@ public sealed class PopoverWindow : Window
     private readonly TextBlock[] tileValues = new TextBlock[4];
     private readonly Dictionary<MetricKind, TextBlock> hardwareValues = new();
     private DateTimeOffset lastHidden = DateTimeOffset.MinValue;
+    // [Part 315] 새 버전 안내 — 알림 창을 닫거나 「나중에」 를 골라도 여기에는 남는다
+    private string? updateVersion;
+    private Action? installUpdate;
 
     public PopoverWindow(SettingsStore settings, HardwareMonitor hardware, Action openSettings)
     {
@@ -221,6 +224,14 @@ public sealed class PopoverWindow : Window
 
     // ── 값 ───────────────────────────────────────────────────
 
+    /// <summary>[Part 315] App 이 새 버전을 찾으면 — 맨 위에 안내 한 줄과 「업데이트」</summary>
+    public void SetUpdate(string version, Action install)
+    {
+        updateVersion = version;
+        installUpdate = install;
+        if (isVisible) Render();
+    }
+
     /// <summary>배터리 — App 의 1분 타이머</summary>
     public void SetBattery(int? value)
     {
@@ -243,6 +254,27 @@ public sealed class PopoverWindow : Window
             body.Children.Add(Notice(S.T(
                 "트레이 아이콘을 누르면 이 창이 열립니다. 끝내려면 아이콘을 오른쪽 클릭한 뒤 「끝내기」 를 고르세요. 설정은 오른쪽 아래 톱니에 있습니다.",
                 "Click the tray icon to open this window. To quit, right-click it and choose \"Exit\". Settings are behind the gear at the bottom right."), Emerald));
+        }
+
+        if (updateVersion is not null && installUpdate is not null)
+        {
+            var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
+            row.Children.Add(new KeepTextBlock(S.T($"새 버전 {updateVersion} 이 나왔습니다.", $"Version {updateVersion} is available.")) { FontSize = 12.5, Foreground = Brush(Text1), VerticalAlignment = VerticalAlignment.Center });
+            var go = new Button
+            {
+                Content = S.T("업데이트", "Update"), FontSize = 12.5, FontWeight = FontWeight.SemiBold, Padding = new Thickness(10, 4, 10, 4),
+                CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1),
+                Background = Brush(Color.FromArgb(0x1F, 0x34, 0xD3, 0x99)), BorderBrush = Brush(Color.FromArgb(0x80, 0x34, 0xD3, 0x99)), Foreground = Brush(Hex("#A7F3D0")),
+            };
+            var install = installUpdate;
+            go.Click += (_, _) => { HideNow(); install(); };
+            Grid.SetColumn(go, 1);
+            row.Children.Add(go);
+            body.Children.Add(new Border
+            {
+                Padding = new Thickness(12, 8, 8, 8), CornerRadius = new CornerRadius(8), Child = row,
+                Background = Brush(Color.FromArgb(0x14, 0x34, 0xD3, 0x99)), BorderBrush = Brush(Color.FromArgb(0x59, 0x34, 0xD3, 0x99)), BorderThickness = new Thickness(1),
+            });
         }
 
         // 요약 타일 4

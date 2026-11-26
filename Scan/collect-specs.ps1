@@ -55,7 +55,7 @@ if ($battery -and $battery.DesignCapacity -gt 0) {
 }
 
 $bios = Get-HardwareInfo "Win32_BIOS"
-$sysAgeYears = 0
+$sysAgeYears = $null
 $referenceDate = Get-Date
 
 if ($os.InstallDate -or $bios.ReleaseDate) {
@@ -68,7 +68,7 @@ if ($os.InstallDate -or $bios.ReleaseDate) {
         $oldestDate = ($dates | Sort-Object)[0]
         $referenceDate = $oldestDate
         $sysAgeYears = [Math]::Round((New-TimeSpan -Start $oldestDate -End (Get-Date)).Days / 365, 1)
-    } catch { $sysAgeYears = 0 }
+    } catch { $sysAgeYears = $null }
 }
 
 # [FIX] Disk Detection
@@ -86,10 +86,13 @@ if ($vramBytes -eq 4294967295 -or $vramBytes -le 4294967296) {
         if ($regVram) { $vramBytes = [uint64]$regVram }
     } catch {}
 }
-$vramGB = [Math]::Round($vramBytes / 1GB)
+$vramGB = if ($vramBytes -gt 0) { [Math]::Round($vramBytes / 1GB) } else { $null }
 
+# [Part 314] AI14 - unread values are $null (numbers) / "Unknown" (text), never a plausible default
+#   (was DDR4, slots 1/2, 1920x1080@60, "Standard Display Adapter", "Primary Storage" SSD, disk Health "OK", "Generic MB", 0).
+#   Same edit in all 4 copies (get_specs.ps1, ScannerLauncher.cs, ScannerLauncher_EN.cs, PCUpCheckTools collect-specs.ps1).
 # 3. Build Final Spec Object
-$ramType = "DDR4"
+$ramType = "Unknown"
 if ($mem) {
     $smType = $mem[0].SMBIOSMemoryType
     if ($smType -eq 26) { $ramType = "DDR4" }
@@ -103,26 +106,26 @@ if ($mem) {
 $specHash = @{
     ScanTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     CPU = @{ 
-        Model = if($cpu.Name){$cpu.Name.ToString().Trim()}else{"Unknown CPU"}; 
-        Cores = if($cpu.NumberOfCores){$cpu.NumberOfCores}else{0}; 
-        Threads = if($cpu.NumberOfLogicalProcessors){$cpu.NumberOfLogicalProcessors}else{0} 
+        Model = if($cpu.Name){$cpu.Name.ToString().Trim()}else{"Unknown"}; 
+        Cores = if($cpu.NumberOfCores){$cpu.NumberOfCores}else{$null}; 
+        Threads = if($cpu.NumberOfLogicalProcessors){$cpu.NumberOfLogicalProcessors}else{$null} 
     }
     RAM = @{ 
-        TotalGB = if($mem){ [Math]::Round(($mem | Measure-Object -Property Capacity -Sum).Sum / 1GB) } else { [Math]::Round($sysInfo.TotalPhysicalMemory / 1GB) }; 
+        TotalGB = if($mem){ [Math]::Round(($mem | Measure-Object -Property Capacity -Sum).Sum / 1GB) } else { if($sysInfo.TotalPhysicalMemory){ [Math]::Round($sysInfo.TotalPhysicalMemory / 1GB) }else{$null} }; 
         Type = $ramType; 
-        Speed = if($mem){$mem[0].Speed}else{0}; 
-        SlotsUsed = if($mem){$mem.Count}else{1}; 
-        TotalSlots = try { (Get-CimInstance Win32_PhysicalMemoryArray -ErrorAction SilentlyContinue).MemoryDevices[0] } catch { 2 }
+        Speed = if($mem){$mem[0].Speed}else{$null}; 
+        SlotsUsed = if($mem){$mem.Count}else{$null}; 
+        TotalSlots = try { (Get-CimInstance Win32_PhysicalMemoryArray -ErrorAction SilentlyContinue).MemoryDevices[0] } catch { $null }
     }
     GPU = @{ 
-        Model = if($gpu.Name){$gpu.Name}else{"Standard Display Adapter"}; 
+        Model = if($gpu.Name){$gpu.Name}else{"Unknown"}; 
         VRAM_GB = $vramGB; 
         DriverVersion = if($gpu.DriverVersion){$gpu.DriverVersion}else{"Unknown"} 
     }
-    Disk = if($disks){ @($disks | ForEach-Object { @{ Model = if($_.Model){$_.Model}else{$_.FriendlyName}; SizeGB = [Math]::Round($_.Size / 1GB, 0); Health = "OK"; BusType = (Get-DiskBusType $_) } }) } else { @(@{Model="Primary Storage"; SizeGB=0; Health="OK"; BusType="SSD"}) }
+    Disk = if($disks){ @($disks | ForEach-Object { @{ Model = if($_.Model){$_.Model}else{$_.FriendlyName}; SizeGB = if($_.Size){[Math]::Round($_.Size / 1GB, 0)}else{$null}; Health = "Unknown"; BusType = (Get-DiskBusType $_) } }) } else { $null }
     Motherboard = @{ 
         Manufacturer = if($board.Manufacturer){$board.Manufacturer}else{$sysInfo.Manufacturer}; 
-        Model = if($board.Product){$board.Product}else{if($board.Name){$board.Name}else{"Generic MB"}} 
+        Model = if($board.Product){$board.Product}else{if($board.Name){$board.Name}else{"Unknown"}} 
     }
     System = @{ 
         Manufacturer = if($sysInfo.Manufacturer){$sysInfo.Manufacturer}else{"Unknown"}; 
@@ -135,9 +138,9 @@ $specHash = @{
         HardwareDate = try { if($bios.ReleaseDate){ ((Convert-WmiDate $bios.ReleaseDate)).ToString("yyyy-MM-dd") }else{"Unknown"} } catch { "Unknown" }
     }
     Display = @{ 
-        Width = if($gpu.CurrentHorizontalResolution){$gpu.CurrentHorizontalResolution}else{1920}; 
-        Height = if($gpu.CurrentVerticalResolution){$gpu.CurrentVerticalResolution}else{1080}; 
-        RefreshRate = if($gpu.CurrentRefreshRate){$gpu.CurrentRefreshRate}else{60} 
+        Width = if($gpu.CurrentHorizontalResolution){$gpu.CurrentHorizontalResolution}else{$null}; 
+        Height = if($gpu.CurrentVerticalResolution){$gpu.CurrentVerticalResolution}else{$null}; 
+        RefreshRate = if($gpu.CurrentRefreshRate){$gpu.CurrentRefreshRate}else{$null} 
     }
     Software = @{ 
         OS = if($os.Caption){$os.Caption}else{"Windows"}; 
